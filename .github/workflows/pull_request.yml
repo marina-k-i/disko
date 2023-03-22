@@ -1,0 +1,72 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+
+      - name: node_modulesをキャッシュしない
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ github.run_id }}-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install NPM packages
+        run: yarn
+
+      - name: prisma generate
+        run: yarn prisma generate
+
+      - name: prisma migrate deploy
+        env:
+          DATABASE_URL: mysql://32hulvf8vi8pyhxwaehv:pscale_pw_IHrlKItnl71OeJpd4gjGZxxjsiG97H8xyOkVOivB2W1@us-east.connect.psdb.cloud/disko?sslaccept=strict
+        run: yarn prisma migrate deploy
+
+      - name: Create comments
+        run: |
+          cat << EOF > comments
+          プレビューがokだったら
+          pscale deploy-request create disko dev
+          EOF
+
+      - name: Post comments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr comment -F ./comments "${URL}"
+
+      - name: Create comments
+        run: |
+          cat << EOF > comments
+          pscaleをマージしたらgithubでもmergeしてvercelのデプロイが行われる
+          EOF
+
+      - name: Post comments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr comment -F ./comments "${URL}"
